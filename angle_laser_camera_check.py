@@ -7,7 +7,6 @@ import threading
 CAMERA_INDEX = 1  # Default camera index (adjust if needed)
 CAMERA_FOV = 68  # Camera field of view in degrees
 PORT_NAME = 'COM3'  # LIDAR port
-# MAX_DISTANCE = 3000  # Maximum distance measurable by the LIDAR in mm
 
 angles = []
 distances = []
@@ -16,8 +15,8 @@ stop_threads = False
 
 def calculate_angle(bbox, frame_width):
     """
-    Calculate the angle of the detected person relative to the center of the camera frame.
-    :param bbox: Bounding box of the detected person (x_min, y_min, x_max, y_max).
+    Calculate the angle of the detected object relative to the center of the camera frame.
+    :param bbox: Bounding box of the detected object (x_min, y_min, x_max, y_max).
     :param frame_width: Width of the camera frame.
     :return: Angle in degrees.
     """
@@ -61,7 +60,7 @@ def camera_thread():
 
     model = YOLO('yolov8n.pt')  # Load YOLOv8 model
 
-    print("Starting person detection... Press 'q' to stop.")
+    print("Starting detection... Press 'q' to stop.")
 
     try:
         while not stop_threads:
@@ -75,7 +74,8 @@ def camera_thread():
             for box in results[0].boxes:  # Extract bounding boxes from results
                 x_min, y_min, x_max, y_max = box.xyxy[0]  # Get bounding box coordinates
                 cls = int(box.cls)  # Get class ID
-                if cls == 0:  # Class 0 corresponds to 'person'
+                if cls in [0, 1]:  # Class 0 corresponds to 'person', Class 1 corresponds to 'bike'
+                    class_name = "person" if cls == 0 else "bike"
                     angle = calculate_angle((x_min, y_min, x_max, y_max), frame.shape[1])
                     angle_range_min = angle - 5
                     angle_range_max = angle + 5
@@ -85,9 +85,9 @@ def camera_thread():
                     if lidar_angle is not None:
                         index = angles.index(lidar_angle)
                         distance = distances[index]
-                        print(f"Detected person at angle: {angle:.2f} degrees, range: [{angle_range_min:.2f}, {angle_range_max:.2f}] degrees, distance: {distance:.2f} mm")
+                        print(f"Detected {class_name} at angle: {angle:.2f} degrees, range: [{angle_range_min:.2f}, {angle_range_max:.2f}] degrees, distance: {distance:.2f} mm")
                     else:
-                        print(f"Detected person at angle: {angle:.2f} degrees, range: [{angle_range_min:.2f}, {angle_range_max:.2f}] degrees, no matching LIDAR data")
+                        print(f"Detected {class_name} at angle: {angle:.2f} degrees, range: [{angle_range_min:.2f}, {angle_range_max:.2f}] degrees, no matching LIDAR data")
 
             # Display the frame
             cv2.imshow('Camera', frame)
@@ -97,7 +97,7 @@ def camera_thread():
                 stop_threads = True
 
     except KeyboardInterrupt:
-        print("Stopping person detection...")
+        print("Stopping detection...")
 
     finally:
         cap.release()
